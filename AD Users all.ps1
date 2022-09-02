@@ -27,8 +27,8 @@ Param (
     [String[]]$GroupName,
     [Parameter(Mandatory)]
     [String[]]$MailTo,
-    [String]$LogFolder = "\\$env:COMPUTERNAME\Log",
-    [String]$ScriptAdmin = 'Brecht.Gijbels@heidelbergcement.com'
+    [String]$LogFolder = "$env:POWERSHELL_LOG_FOLDER\AD Reports\AD users all\$ScriptName",
+    [String[]]$ScriptAdmin = $env:POWERSHELL_SCRIPT_ADMIN
 )
 
 Begin {
@@ -37,12 +37,20 @@ Begin {
         Import-EventLogParamsHC -Source $ScriptName
         Write-EventLog @EventStartParams
 
-        $LogParams = @{
-            LogFolder = New-FolderHC -Path $LogFolder -ChildPath "AD Reports\AD users all\$ScriptName"
-            Name      = $ScriptName
-            Date      = 'ScriptStartTime'
+        #region Logging
+        try {
+            $logParams = @{
+                LogFolder    = New-Item -Path $LogFolder -ItemType 'Directory' -Force -ErrorAction 'Stop'
+                Name         = $ScriptName
+                Date         = 'ScriptStartTime'
+                NoFormatting = $true
+            }
+            $logFile = New-LogFileNameHC @LogParams
         }
-        $LogFile = New-LogFileNameHC @LogParams
+        Catch {
+            throw "Failed creating the log folder '$LogFolder': $_"
+        }
+        #endregion
 
         $MailParams = @{
             To        = $MailTo
