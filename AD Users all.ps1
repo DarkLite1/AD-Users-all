@@ -27,7 +27,7 @@ Param (
     [String[]]$GroupName,
     [Parameter(Mandatory)]
     [String[]]$MailTo,
-    [String]$LogFolder = "$env:POWERSHELL_LOG_FOLDER\AD Reports\AD users all\$ScriptName",
+    [String]$LogFolder = "$env:POWERSHELL_LOG_FOLDER\AD Reports\AD Users all\$ScriptName",
     [String[]]$ScriptAdmin = $env:POWERSHELL_SCRIPT_ADMIN
 )
 
