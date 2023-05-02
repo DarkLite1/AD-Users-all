@@ -22,6 +22,7 @@
         One or more e-mail addresses.
 #>
 
+[CmdLetBinding()]
 Param (
     [Parameter(Mandatory)]
     [String]$ScriptName,
@@ -75,17 +76,27 @@ Begin {
 Process {
     Try {
         #region Get group members
-        $GroupMember = @{}
-
         foreach ($G in ($GroupName | Sort-Object -Unique)) {
+            $M = "Get group members '$G'"
+            Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
+
+            $GroupMember = @{}
             $GroupMember[$G] = Get-ADGroupMember -Identity $G -Recursive -EA Stop |
             Select-Object -ExpandProperty SamAccountName
         }
         #endregion
 
+        #region Get users
+        $M = "Get users in OU '$OU'"
+        Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
+            
         $Users = Get-ADUserHC -OU $OU
+        #endregion
 
         #region Add group membership
+        $M = "Add group membership"
+        Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
+
         foreach ($U in $Users) {
             $GroupMember.GetEnumerator().ForEach( {
                     $AddMemberParams = @{
@@ -98,6 +109,7 @@ Process {
         }
         #endregion
 
+        #region Export to Excel
         $ExcelParams = @{
             Path               = $LogFile + ' - Result.xlsx'
             AutoSize           = $true
@@ -109,10 +121,15 @@ Process {
             'MobilePhone', 'ipPhone', 'Fax', 'Pager'
             ErrorAction        = 'Stop'
         }
+
+        $M = "Export users to Excel file '$($ExcelParams.Path)'"
+        Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
+
         Remove-Item $ExcelParams.Path -Force -EA Ignore
         $Users | Export-Excel @ExcelParams
 
         $MailParams.Attachments = $ExcelParams.Path
+        #endregion
 
         $MailParams.Message = "A total of <b>$(@($Users).count) user accounts</b> have been found. <p><i>* Check the attachment for details </i></p>
             $($OU | ConvertTo-OuNameHC -OU | Sort-Object | ConvertTo-HtmlListHC -Header 'Organizational units:')"
