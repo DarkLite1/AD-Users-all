@@ -1,4 +1,8 @@
-﻿<#
+﻿#Requires -Version 5.1
+#Requires -Modules ActiveDirectory, ImportExcel
+#Requires -Modules Toolbox.ActiveDirectory, Toolbox.HTML, Toolbox.EventLog
+
+<#
     .SYNOPSIS
         Retrieve all the user accounts found in a specific OU within AD.
 
