@@ -126,7 +126,12 @@ Process {
         Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
 
         Remove-Item $ExcelParams.Path -Force -EA Ignore
-        $Users | Export-Excel @ExcelParams
+        $Users | Select-Object -ExcludeProperty 'SmtpAddresses' -Property *, @{
+            Name       = 'SmtpAddresses'
+            Expression = {
+                $_.SmtpAddresses -join ', '
+            }
+        } | Export-Excel @ExcelParams
 
         $MailParams.Attachments = $ExcelParams.Path
         #endregion
