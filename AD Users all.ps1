@@ -33,7 +33,10 @@ Param (
     [Parameter(Mandatory)]
     [String[]]$MailTo,
     [String]$LogFolder = "$env:POWERSHELL_LOG_FOLDER\AD Reports\AD Users all\$ScriptName",
-    [String[]]$ScriptAdmin = $env:POWERSHELL_SCRIPT_ADMIN
+    [String[]]$ScriptAdmin = @(
+        $env:POWERSHELL_SCRIPT_ADMIN,
+        $env:POWERSHELL_SCRIPT_ADMIN_BACKUP
+    )
 )
 
 Begin {
