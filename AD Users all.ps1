@@ -4,22 +4,26 @@
 
 <#
     .SYNOPSIS
-        Retrieve all the user accounts found in a specific OU within AD.
+        Create a list of all the user accounts found in a specific OU within AD.
 
     .DESCRIPTION
-        Retrieve all active directory user accounts found in a specific
-        organizational unit within the active directory.
+        Report all the users accounts found in an organizational unit within
+        active directory. Check if the found user is a member of the group names
+        in the import file. Send the result by mail in an Excel sheet.
 
     .PARAMETER OU
         One or more organizational units in the active directory.
 
     .PARAMETER GroupName
-        One or more active directory group object names. Every user account
+        One or more active directory group names. Every user account
         will be checked for group membership and an extra column will be added
         to the Excel sheet with the group name and a true/false value.
 
-    .PARAMETER MailTo
-        One or more e-mail addresses.
+    .PARAMETER ImportFile
+        A .json file containing the script arguments.
+
+    .PARAMETER LogFolder
+        Location for the log files.
 #>
 
 [CmdLetBinding()]
