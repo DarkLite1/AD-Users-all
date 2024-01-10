@@ -7,14 +7,14 @@
         Retrieve all the user accounts found in a specific OU within AD.
 
     .DESCRIPTION
-        Retrieve all active directory user accounts found in a specific 
+        Retrieve all active directory user accounts found in a specific
         organizational unit within the active directory.
 
     .PARAMETER OU
         One or more organizational units in the active directory.
 
     .PARAMETER GroupName
-        One or more active directory group object names. Every user account 
+        One or more active directory group object names. Every user account
         will be checked for group membership and an extra column will be added
         to the Excel sheet with the group name and a true/false value.
 
@@ -27,11 +27,7 @@ Param (
     [Parameter(Mandatory)]
     [String]$ScriptName,
     [Parameter(Mandatory)]
-    [String[]]$OU,
-    [Parameter(Mandatory)]
-    [String[]]$GroupName,
-    [Parameter(Mandatory)]
-    [String[]]$MailTo,
+    [String]$ImportFile,
     [String]$LogFolder = "$env:POWERSHELL_LOG_FOLDER\AD Reports\AD Users all\$ScriptName",
     [String[]]$ScriptAdmin = @(
         $env:POWERSHELL_SCRIPT_ADMIN,
@@ -60,7 +56,23 @@ Begin {
         }
         #endregion
 
-        $MailParams = @{
+        #region Import input file
+        $File = Get-Content $ImportFile -Raw -EA Stop | ConvertFrom-Json
+
+        if (-not ($MailTo = $File.MailTo)) {
+            throw "Input file '$ImportFile': No 'MailTo' addresses found."
+        }
+
+        if (-not ($adOUs = $File.AD.OU)) {
+            throw "Input file '$ImportFile': No 'AD.OU' found."
+        }
+
+        if (-not ($adGroupNames = $File.AD.GroupName)) {
+            throw "Input file '$ImportFile': No 'AD.GroupName' found."
+        }
+        #endregion
+
+        $mailParams = @{
             To        = $MailTo
             Bcc       = $ScriptAdmin
             LogFolder = $LogParams.LogFolder
@@ -70,87 +82,98 @@ Begin {
     }
     Catch {
         Write-Warning $_
+        Send-MailHC -To $ScriptAdmin -Subject 'FAILURE' -Priority 'High' -Message $_ -Header $ScriptName
         Write-EventLog @EventErrorParams -Message "FAILURE:`n`n- $_"
-        Write-EventLog @EventEndParams
-        $errorMessage = $_; $global:error.RemoveAt(0); throw $errorMessage
+        Write-EventLog @EventEndParams; Exit 1
     }
 }
 
 Process {
     Try {
         #region Get group members
-        foreach ($G in ($GroupName | Sort-Object -Unique)) {
-            $M = "Get group members '$G'"
+        $groupMember = @{}
+
+        foreach (
+            $groupName in
+            ($adGroupNames | Sort-Object -Unique)
+        ) {
+            $M = "Get group members '$groupName'"
             Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
 
-            $GroupMember = @{}
-            $GroupMember[$G] = Get-ADGroupMember -Identity $G -Recursive -EA Stop |
+            $groupMember[$groupName] = Get-ADGroupMember -Identity $groupName -Recursive -EA Stop |
             Select-Object -ExpandProperty SamAccountName
         }
         #endregion
 
         #region Get users
-        $M = "Get users in OU '$OU'"
+        $M = "Get users in OU '$adOUs'"
         Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
-            
-        $Users = Get-ADUserHC -OU $OU
+
+        $adUsers = Get-ADUserHC -OU $adOUs
         #endregion
 
         #region Add group membership
         $M = "Add group membership"
         Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
 
-        foreach ($U in $Users) {
-            $GroupMember.GetEnumerator().ForEach( {
-                    $AddMemberParams = @{
-                        InputObject       = $U
+        foreach ($user in $adUsers) {
+            $groupMember.GetEnumerator().ForEach(
+                {
+                    $params = @{
+                        InputObject       = $user
                         NotePropertyName  = $_.Name
-                        NotePropertyValue = $_.Value -contains $U.'Logon name'
+                        NotePropertyValue = $_.Value -contains $user.'Logon name'
                     }
-                    Add-Member @AddMemberParams
-                })
+                    Add-Member @params
+                }
+            )
         }
         #endregion
 
         #region Export to Excel
-        $ExcelParams = @{
-            Path               = $LogFile + ' - Result.xlsx'
+        $excelParams = @{
+            Path               = $logFile + ' - Result.xlsx'
             AutoSize           = $true
             BoldTopRow         = $true
             FreezeTopRow       = $true
             WorkSheetName      = 'Users'
             TableName          = 'Users'
-            NoNumberConversion = 'Employee ID', 'OfficePhone', 'HomePhone', 
-            'MobilePhone', 'ipPhone', 'Fax', 'Pager'
+            NoNumberConversion = @(
+                'Employee ID', 'OfficePhone', 'HomePhone',
+                'MobilePhone', 'ipPhone', 'Fax', 'Pager'
+            )
             ErrorAction        = 'Stop'
         }
 
-        $M = "Export users to Excel file '$($ExcelParams.Path)'"
+        $M = "Export users to Excel file '$($excelParams.Path)'"
         Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
 
-        Remove-Item $ExcelParams.Path -Force -EA Ignore
-        $Users | Select-Object -ExcludeProperty 'SmtpAddresses' -Property *, @{
+        Remove-Item $excelParams.Path -Force -EA Ignore
+
+        $adUsers | Select-Object -ExcludeProperty 'SmtpAddresses' -Property *,
+        @{
             Name       = 'SmtpAddresses'
             Expression = {
                 $_.SmtpAddresses -join ', '
             }
-        } | Export-Excel @ExcelParams
+        } | Export-Excel @excelParams
 
-        $MailParams.Attachments = $ExcelParams.Path
+        $mailParams.Attachments = $excelParams.Path
         #endregion
 
-        $MailParams.Message = "A total of <b>$(@($Users).count) user accounts</b> have been found. <p><i>* Check the attachment for details </i></p>
-            $($OU | ConvertTo-OuNameHC -OU | Sort-Object | ConvertTo-HtmlListHC -Header 'Organizational units:')"
+        $mailParams.Message = "A total of <b>$($adUsers.Count) user accounts</b> have been found. <p><i>* Check the attachment for details </i></p>
+            $($adOUs | ConvertTo-OuNameHC -OU | Sort-Object | ConvertTo-HtmlListHC -Header 'Organizational units:')"
 
-        $MailParams.Subject = "$(@($Users).count) user accounts"
+        $mailParams.Subject = "$(@($adUsers).count) user accounts"
 
         Get-ScriptRuntimeHC -Stop
-        Send-MailHC @MailParams
+        Send-MailHC @mailParams
     }
     Catch {
         Write-Warning $_
+        Send-MailHC -To $ScriptAdmin -Subject 'FAILURE' -Priority 'High' -Message $_ -Header $ScriptName
         Write-EventLog @EventErrorParams -Message "FAILURE:`n`n- $_"
-        $errorMessage = $_; $global:error.RemoveAt(0); throw $errorMessage
+        Exit 1
     }
     Finally {
         Write-EventLog @EventEndParams

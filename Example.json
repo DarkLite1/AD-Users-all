@@ -6,6 +6,7 @@
       "OU=LUX,OU=EU,DC=contoso,DC=com",
       "OU=NLD,OU=EU,DC=contoso,DC=com"
     ],
-    "GroupName": ["Directors"]
+    "GroupName": ["Directors"],
+    "?": "Check if the user found in the OU is member of the group(s) in GroupName"
   }
 }
