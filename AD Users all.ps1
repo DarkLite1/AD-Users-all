@@ -165,6 +165,7 @@ Process {
         $mailParams.Attachments = $excelParams.Path
         #endregion
 
+        #region Send mail
         $mailParams.Message = "A total of <b>$($adUsers.Count) user accounts</b> have been found. <p><i>* Check the attachment for details </i></p>
             $($adOUs | ConvertTo-OuNameHC -OU | Sort-Object | ConvertTo-HtmlListHC -Header 'Organizational units:')"
 
@@ -172,6 +173,7 @@ Process {
 
         Get-ScriptRuntimeHC -Stop
         Send-MailHC @mailParams
+        #endregion
     }
     Catch {
         Write-Warning $_
