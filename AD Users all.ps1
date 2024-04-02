@@ -71,9 +71,7 @@ Begin {
             throw "Input file '$ImportFile': No 'AD.OU' found."
         }
 
-        if (-not ($adGroupNames = $File.AD.GroupName)) {
-            throw "Input file '$ImportFile': No 'AD.GroupName' found."
-        }
+        $adGroupNames = $File.AD.GroupName
         #endregion
 
         $mailParams = @{
@@ -117,20 +115,22 @@ Process {
         #endregion
 
         #region Add group membership
-        $M = "Add group membership"
-        Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
+        if ($groupMember.Count) {
+            $M = "Add group membership"
+            Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
 
-        foreach ($user in $adUsers) {
-            $groupMember.GetEnumerator().ForEach(
-                {
-                    $params = @{
-                        InputObject       = $user
-                        NotePropertyName  = $_.Name
-                        NotePropertyValue = $_.Value -contains $user.'Logon name'
+            foreach ($user in $adUsers) {
+                $groupMember.GetEnumerator().ForEach(
+                    {
+                        $params = @{
+                            InputObject       = $user
+                            NotePropertyName  = $_.Name
+                            NotePropertyValue = $_.Value -contains $user.'Logon name'
+                        }
+                        Add-Member @params
                     }
-                    Add-Member @params
-                }
-            )
+                )
+            }
         }
         #endregion
 
